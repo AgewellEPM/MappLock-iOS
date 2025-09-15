@@ -1,0 +1,1 @@
+kiosk,security,enterprise,mdm,lock,business,education,guided access,single app mode,device management,parental control,screen time,focus,productivity,digital signage,point of sale,compliance,audit,biometric,face id,touch id,tablet,ipad,professional

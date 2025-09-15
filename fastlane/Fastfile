@@ -1,0 +1,499 @@
+# Fastfile for MappLock iOS
+
+default_platform(:ios)
+
+# Constants
+WORKSPACE = "MappLock.xcworkspace"
+PROJECT = "MappLock.xcodeproj"
+SCHEME = "MappLock"
+APP_IDENTIFIER = "com.mapplock.ios"
+TEAM_ID = ENV["APPLE_TEAM_ID"]
+KEYCHAIN_NAME = "fastlane_tmp_keychain"
+
+platform :ios do
+  # Before all lanes
+  before_all do
+    setup_circle_ci if ENV['CI']
+
+    # Set up certificates and provisioning profiles
+    create_keychain(
+      name: KEYCHAIN_NAME,
+      password: ENV["KEYCHAIN_PASSWORD"] || "temp_password",
+      default_keychain: true,
+      unlock: true,
+      timeout: 3600,
+      lock_when_sleeps: false
+    ) if ENV['CI']
+  end
+
+  # Development Lane
+  desc "Build for development"
+  lane :dev do
+    # Sync certificates and provisioning profiles
+    sync_code_signing(
+      type: "development",
+      app_identifier: [APP_IDENTIFIER, "#{APP_IDENTIFIER}.widget", "#{APP_IDENTIFIER}.enterprise"],
+      team_id: TEAM_ID,
+      keychain_name: KEYCHAIN_NAME,
+      keychain_password: ENV["KEYCHAIN_PASSWORD"] || "temp_password"
+    )
+
+    # Build the app
+    build_app(
+      workspace: WORKSPACE,
+      scheme: SCHEME,
+      configuration: "Debug",
+      export_method: "development",
+      output_directory: "./build",
+      output_name: "MappLock-Development.ipa",
+      clean: true,
+      include_bitcode: false
+    )
+
+    # Upload to Firebase App Distribution for internal testing
+    if ENV["FIREBASE_APP_ID"] && ENV["FIREBASE_CLI_TOKEN"]
+      firebase_app_distribution(
+        app: ENV["FIREBASE_APP_ID"],
+        firebase_cli_token: ENV["FIREBASE_CLI_TOKEN"],
+        ipa_path: "./build/MappLock-Development.ipa",
+        groups: "internal-testers",
+        release_notes: "Development build with latest features"
+      )
+    end
+
+    # Notify team
+    slack(
+      message: "✅ MappLock iOS development build completed successfully!",
+      success: true,
+      slack_url: ENV["SLACK_URL"],
+      attachment_properties: {
+        fields: [
+          {
+            title: "Build Type",
+            value: "Development",
+            short: true
+          },
+          {
+            title: "Version",
+            value: get_version_number(xcodeproj: PROJECT),
+            short: true
+          }
+        ]
+      }
+    ) if ENV["SLACK_URL"]
+  end
+
+  # Testing Lane
+  desc "Run tests"
+  lane :test do
+    # Run SwiftLint
+    swiftlint(
+      mode: :lint,
+      config_file: ".swiftlint.yml",
+      strict: true,
+      reporter: "junit",
+      output_file: "./build/swiftlint-results.xml"
+    )
+
+    # Run unit tests
+    run_tests(
+      workspace: WORKSPACE,
+      scheme: SCHEME,
+      configuration: "Debug",
+      devices: ["iPhone 15", "iPad Pro (12.9-inch) (6th generation)"],
+      output_directory: "./build/test-results",
+      output_types: "html,junit",
+      buildlog_path: "./build/logs",
+      result_bundle: true,
+      code_coverage: true,
+      skip_build: false,
+      clean: true
+    )
+
+    # Generate code coverage report
+    xcov(
+      workspace: WORKSPACE,
+      scheme: SCHEME,
+      output_directory: "./build/coverage",
+      html_report: true,
+      json_report: true,
+      minimum_coverage_percentage: 80.0
+    )
+
+    # Upload test results to CI dashboard
+    if ENV['CI']
+      upload_test_results_to_ci
+    end
+  end
+
+  # Beta Lane (TestFlight)
+  desc "Deploy to TestFlight"
+  lane :beta do
+    # Ensure repo is clean
+    ensure_git_status_clean
+
+    # Increment build number
+    increment_build_number(
+      xcodeproj: PROJECT
+    )
+
+    # Sync certificates and provisioning profiles
+    sync_code_signing(
+      type: "appstore",
+      app_identifier: [APP_IDENTIFIER, "#{APP_IDENTIFIER}.widget", "#{APP_IDENTIFIER}.enterprise"],
+      team_id: TEAM_ID,
+      keychain_name: KEYCHAIN_NAME,
+      keychain_password: ENV["KEYCHAIN_PASSWORD"] || "temp_password"
+    )
+
+    # Build the app
+    build_app(
+      workspace: WORKSPACE,
+      scheme: SCHEME,
+      configuration: "Release",
+      export_method: "app-store",
+      output_directory: "./build",
+      output_name: "MappLock-Beta.ipa",
+      clean: true,
+      include_bitcode: false,
+      export_options: {
+        uploadBitcode: false,
+        uploadSymbols: true,
+        compileBitcode: false,
+        manageAppVersionAndBuildNumber: false,
+        testFlightInternalTestingOnly: false
+      }
+    )
+
+    # Upload to TestFlight
+    upload_to_testflight(
+      api_key_path: ENV["APPSTORE_API_KEY_PATH"],
+      skip_submission: false,
+      skip_waiting_for_build_processing: false,
+      changelog: generate_changelog,
+      groups: ["Internal Testers", "Beta Testers"],
+      notify_external_testers: true,
+      distribute_external: true
+    )
+
+    # Commit version bump
+    commit_version_bump(
+      message: "Version bump for TestFlight build",
+      xcodeproj: PROJECT
+    )
+
+    # Tag the release
+    add_git_tag(
+      tag: "v#{get_version_number(xcodeproj: PROJECT)}-beta.#{get_build_number(xcodeproj: PROJECT)}"
+    )
+
+    # Push to repository
+    push_to_git_remote(
+      remote: "origin",
+      local_branch: "main",
+      remote_branch: "main",
+      tags: true
+    )
+
+    # Notify team
+    slack(
+      message: "🚀 MappLock iOS Beta deployed to TestFlight!",
+      success: true,
+      slack_url: ENV["SLACK_URL"],
+      attachment_properties: {
+        fields: [
+          {
+            title: "Version",
+            value: "#{get_version_number(xcodeproj: PROJECT)} (#{get_build_number(xcodeproj: PROJECT)})",
+            short: true
+          },
+          {
+            title: "TestFlight",
+            value: "Available for beta testers",
+            short: true
+          }
+        ]
+      }
+    ) if ENV["SLACK_URL"]
+  end
+
+  # Release Lane (App Store)
+  desc "Deploy to App Store"
+  lane :release do
+    # Ensure repo is clean
+    ensure_git_status_clean
+
+    # Ensure we're on main branch
+    ensure_git_branch(
+      branch: "main"
+    )
+
+    # Run tests before release
+    test
+
+    # Increment version number
+    increment_version_number(
+      xcodeproj: PROJECT,
+      bump_type: "minor"
+    )
+
+    # Reset build number for release
+    increment_build_number(
+      xcodeproj: PROJECT,
+      build_number: "1"
+    )
+
+    # Sync certificates and provisioning profiles
+    sync_code_signing(
+      type: "appstore",
+      app_identifier: [APP_IDENTIFIER, "#{APP_IDENTIFIER}.widget", "#{APP_IDENTIFIER}.enterprise"],
+      team_id: TEAM_ID,
+      keychain_name: KEYCHAIN_NAME,
+      keychain_password: ENV["KEYCHAIN_PASSWORD"] || "temp_password"
+    )
+
+    # Build the app
+    build_app(
+      workspace: WORKSPACE,
+      scheme: SCHEME,
+      configuration: "Release",
+      export_method: "app-store",
+      output_directory: "./build",
+      output_name: "MappLock-Release.ipa",
+      clean: true,
+      include_bitcode: false
+    )
+
+    # Upload to App Store Connect
+    upload_to_app_store(
+      api_key_path: ENV["APPSTORE_API_KEY_PATH"],
+      force: true,
+      skip_metadata: false,
+      skip_screenshots: false,
+      submit_for_review: false,
+      automatic_release: false,
+      metadata_path: "./fastlane/metadata",
+      screenshots_path: "./fastlane/screenshots"
+    )
+
+    # Commit version bump
+    commit_version_bump(
+      message: "Release version #{get_version_number(xcodeproj: PROJECT)}",
+      xcodeproj: PROJECT
+    )
+
+    # Tag the release
+    add_git_tag(
+      tag: "v#{get_version_number(xcodeproj: PROJECT)}"
+    )
+
+    # Push to repository
+    push_to_git_remote(
+      remote: "origin",
+      local_branch: "main",
+      remote_branch: "main",
+      tags: true
+    )
+
+    # Create GitHub release
+    github_release = set_github_release(
+      repository_name: "mapplock/ios",
+      api_token: ENV["GITHUB_TOKEN"],
+      name: "MappLock iOS v#{get_version_number(xcodeproj: PROJECT)}",
+      tag_name: "v#{get_version_number(xcodeproj: PROJECT)}",
+      description: generate_changelog,
+      is_draft: false,
+      is_prerelease: false,
+      upload_assets: ["./build/MappLock-Release.ipa"]
+    ) if ENV["GITHUB_TOKEN"]
+
+    # Notify team
+    slack(
+      message: "🎉 MappLock iOS v#{get_version_number(xcodeproj: PROJECT)} released to App Store!",
+      success: true,
+      slack_url: ENV["SLACK_URL"],
+      attachment_properties: {
+        fields: [
+          {
+            title: "Version",
+            value: get_version_number(xcodeproj: PROJECT),
+            short: true
+          },
+          {
+            title: "Status",
+            value: "Submitted for App Store Review",
+            short: true
+          }
+        ]
+      }
+    ) if ENV["SLACK_URL"]
+  end
+
+  # Screenshots Lane
+  desc "Generate screenshots"
+  lane :screenshots do
+    capture_screenshots(
+      workspace: WORKSPACE,
+      scheme: "MappLockUITests",
+      output_directory: "./fastlane/screenshots",
+      clear_previous_screenshots: true,
+      override_status_bar: true,
+      localize_simulator: true,
+      dark_mode: false,
+      devices: [
+        "iPhone 15 Pro Max",
+        "iPhone 15",
+        "iPhone SE (3rd generation)",
+        "iPad Pro (12.9-inch) (6th generation)",
+        "iPad Pro (11-inch) (4th generation)"
+      ],
+      languages: ["en-US"],
+      launch_arguments: ["--uitesting"]
+    )
+
+    # Generate framed screenshots
+    frame_screenshots(
+      path: "./fastlane/screenshots",
+      rose_gold: false,
+      silver: true,
+      gold: false,
+      force_device_type: nil
+    )
+
+    # Upload to App Store Connect
+    upload_to_app_store(
+      api_key_path: ENV["APPSTORE_API_KEY_PATH"],
+      skip_binary_upload: true,
+      skip_metadata: true,
+      overwrite_screenshots: true
+    ) if ENV["UPLOAD_SCREENSHOTS"]
+  end
+
+  # Metadata Lane
+  desc "Upload metadata to App Store Connect"
+  lane :metadata do
+    upload_to_app_store(
+      api_key_path: ENV["APPSTORE_API_KEY_PATH"],
+      skip_binary_upload: true,
+      skip_screenshots: true,
+      metadata_path: "./fastlane/metadata",
+      force: true
+    )
+  end
+
+  # Code Signing Setup
+  desc "Setup code signing"
+  lane :certificates do
+    sync_code_signing(
+      type: "development",
+      app_identifier: [APP_IDENTIFIER, "#{APP_IDENTIFIER}.widget", "#{APP_IDENTIFIER}.enterprise"],
+      team_id: TEAM_ID
+    )
+
+    sync_code_signing(
+      type: "appstore",
+      app_identifier: [APP_IDENTIFIER, "#{APP_IDENTIFIER}.widget", "#{APP_IDENTIFIER}.enterprise"],
+      team_id: TEAM_ID
+    )
+  end
+
+  # Maintenance Lane
+  desc "Maintenance tasks"
+  lane :maintenance do
+    # Clean build artifacts
+    clean_build_artifacts(
+      exclude_pattern: "*.dSYM.zip"
+    )
+
+    # Update dependencies
+    cocoapods(
+      clean_install: true,
+      podfile: "./Podfile"
+    ) if File.exist?("./Podfile")
+
+    # Update fastlane
+    update_fastlane
+
+    UI.success("🧹 Maintenance tasks completed!")
+  end
+
+  # Notification helper
+  def upload_test_results_to_ci
+    # Upload test results to your preferred CI dashboard
+    # This could be integrating with services like:
+    # - Codecov
+    # - SonarCloud
+    # - Custom dashboard
+    UI.message("Uploading test results to CI dashboard...")
+  end
+
+  # Changelog generator
+  def generate_changelog
+    changelog_from_git_commits(
+      between: ["HEAD~10", "HEAD"],
+      pretty: "- %s",
+      date_format: "short",
+      match_lightweight_tag: false,
+      merge_commit_filtering: "exclude_merges"
+    )
+  rescue
+    "Bug fixes and improvements"
+  end
+
+  # After all lanes
+  after_all do |lane|
+    # Clean up keychain if we're on CI
+    if ENV['CI']
+      delete_keychain(name: KEYCHAIN_NAME)
+    end
+
+    UI.success("✅ Lane '#{lane}' completed successfully!")
+  end
+
+  # Error handling
+  error do |lane, exception|
+    # Clean up keychain if we're on CI
+    if ENV['CI']
+      delete_keychain(name: KEYCHAIN_NAME)
+    end
+
+    # Notify team of failure
+    slack(
+      message: "❌ Lane '#{lane}' failed: #{exception.message}",
+      success: false,
+      slack_url: ENV["SLACK_URL"]
+    ) if ENV["SLACK_URL"]
+
+    UI.error("💥 Lane '#{lane}' failed with error: #{exception.message}")
+  end
+end
+
+# Platform-independent lanes
+desc "Setup development environment"
+lane :setup do
+  # Install dependencies
+  sh("bundle install")
+
+  # Setup git hooks
+  sh("cp scripts/git-hooks/* .git/hooks/")
+  sh("chmod +x .git/hooks/*")
+
+  # Install SwiftLint if not present
+  sh("which swiftlint || brew install swiftlint")
+
+  UI.success("🎯 Development environment setup complete!")
+end
+
+desc "Clean everything"
+lane :clean_all do
+  # Clean Xcode build artifacts
+  clean_build_artifacts
+
+  # Clean derived data
+  clear_derived_data
+
+  # Reset simulators
+  reset_simulators
+
+  UI.success("🧹 Everything cleaned!")
+end

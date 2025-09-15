@@ -1,0 +1,53 @@
+🎉 MappLock iOS v1.0 - Initial Release
+
+Welcome to MappLock for iOS! Transform your iPad or iPhone into a professional, secure kiosk with our powerful new mobile app.
+
+🔒 NEW FEATURES
+• Multiple kiosk modes: Guided Access, Screen Time, Autonomous, and Single App Mode
+• Biometric authentication with Face ID and Touch ID support
+• Real-time violation monitoring and automatic enforcement
+• Comprehensive session management with flexible time controls
+
+📱 ADAPTIVE DESIGN
+• Universal interface optimized for both iPad and iPhone
+• Beautiful layouts that scale from iPhone SE to iPad Pro Max
+• Seamless portrait and landscape support
+• One-handed operation with gesture-friendly controls
+
+🏢 ENTERPRISE READY
+• MDM integration for centralized device management
+• Advanced analytics and compliance reporting
+• Bulk configuration and deployment capabilities
+• Audit logging for enterprise security requirements
+
+📊 POWERFUL ANALYTICS
+• Detailed usage statistics and violation tracking
+• Export capabilities for compliance documentation
+• Real-time monitoring dashboard
+• Trend analysis and performance metrics
+
+🎓 PERFECT FOR EDUCATION
+• Standardized testing environments
+• Student-focused learning sessions
+• Classroom behavior management
+• Interactive educational displays
+
+💼 BUSINESS SOLUTIONS
+• Point-of-sale systems and customer displays
+• Digital signage and information kiosks
+• Trade show and event presentations
+• Retail product demonstrations
+
+🌟 ADDITIONAL FEATURES
+• Home screen widgets for quick session status
+• Emergency override for authorized personnel
+• Offline functionality with optional cloud sync
+• Regular automatic updates with new features
+
+🛡️ PRIVACY FOCUSED
+• All data processed locally on your device
+• No personal data collection or tracking
+• Transparent privacy practices
+• Enterprise-grade security standards
+
+Download MappLock today and experience the future of professional kiosk management on iOS!

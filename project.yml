@@ -1,0 +1,97 @@
+name: MappLock
+options:
+  bundleIdPrefix: com.mapplock
+  deploymentTarget:
+    iOS: 16.1
+  createIntermediateGroups: true
+  generateEmptyDirectories: true
+  groupSortPosition: top
+  developmentLanguage: en
+  xcodeVersion: 15.1
+
+settings:
+  base:
+    PRODUCT_BUNDLE_IDENTIFIER: com.mapplock.ios
+    MARKETING_VERSION: 1.0.0
+    CURRENT_PROJECT_VERSION: 1
+    DEVELOPMENT_TEAM: $(DEVELOPMENT_TEAM)
+    SWIFT_VERSION: 5.9
+    IPHONEOS_DEPLOYMENT_TARGET: 16.1
+    ENABLE_PREVIEWS: YES
+    GENERATE_INFOPLIST_FILE: YES
+    CODE_SIGN_STYLE: Automatic
+    SUPPORTS_MACCATALYST: NO
+    SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD: NO
+
+targets:
+  MappLock:
+    type: application
+    platform: iOS
+    sources:
+      - path: MappLockCore.swift
+      - path: Managers.swift
+      - path: MappLockApp.swift
+      - path: SimpleContentView.swift
+      - path: TestContentView.swift
+      - path: ContentView.swift
+      - path: SessionView.swift
+      - path: iOSKioskController.swift
+    info:
+      path: Info.plist
+      properties:
+        UILaunchScreen: {}
+    settings:
+      base:
+        PRODUCT_NAME: MappLock
+        PRODUCT_BUNDLE_IDENTIFIER: com.mapplock.ios
+        INFOPLIST_FILE: Info.plist
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
+        TARGETED_DEVICE_FAMILY: 1,2
+        SUPPORTS_MACCATALYST: NO
+        ENABLE_PREVIEWS: YES
+    dependencies:
+      - sdk: UIKit.framework
+      - sdk: SwiftUI.framework
+      - sdk: Combine.framework
+      - sdk: LocalAuthentication.framework
+      - sdk: CoreData.framework
+      - sdk: CloudKit.framework
+    scheme:
+      testTargets:
+        - MappLockTests
+      gatherCoverageData: true
+      commandLineArguments:
+        "--uitesting": false
+
+  MappLockTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - path: MappLockTests.swift
+    dependencies:
+      - target: MappLock
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.mapplock.ios.tests
+
+schemes:
+  MappLock:
+    build:
+      targets:
+        MappLock: all
+    run:
+      config: Debug
+      commandLineArguments:
+        "--enable-testing-mode": false
+    test:
+      config: Debug
+      gatherCoverageData: true
+      targets:
+        - MappLockTests
+    profile:
+      config: Release
+    analyze:
+      config: Debug
+    archive:
+      config: Release
