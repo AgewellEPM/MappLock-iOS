@@ -18,6 +18,7 @@ struct MappLockApp: App {
                 .environmentObject(sessionManager)
                 .environmentObject(settingsManager)
                 .environmentObject(kioskManager)
+                .preferredColorScheme(.dark)
                 .onAppear {
                     setupApp()
                 }
@@ -48,13 +49,27 @@ struct MappLockApp: App {
     }
 
     private func configureAppearance() {
-        // Configure global app appearance
+        // Configure global app appearance for dark theme
         UINavigationBar.appearance().largeTitleTextAttributes = [
-            .foregroundColor: UIColor.label
+            .foregroundColor: UIColor.white
         ]
+        UINavigationBar.appearance().titleTextAttributes = [
+            .foregroundColor: UIColor.white
+        ]
+        UINavigationBar.appearance().tintColor = UIColor.white
+        UINavigationBar.appearance().backgroundColor = UIColor.clear
+        UINavigationBar.appearance().barTintColor = UIColor.clear
 
-        UITabBar.appearance().backgroundColor = UIColor.systemBackground
-        UITabBar.appearance().barTintColor = UIColor.systemBackground
+        UITabBar.appearance().backgroundColor = UIColor.clear
+        UITabBar.appearance().barTintColor = UIColor.clear
+        UITabBar.appearance().tintColor = UIColor.systemPurple
+
+        // Override interface style to dark
+        if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene {
+            windowScene.windows.forEach { window in
+                window.overrideUserInterfaceStyle = .dark
+            }
+        }
     }
 
     private func requestNotificationPermissions() async {
@@ -62,9 +77,9 @@ struct MappLockApp: App {
 
         do {
             let granted = try await center.requestAuthorization(options: [.alert, .badge, .sound])
-            logger.info("Notification permissions granted: \\(granted)")
+            logger.info("Notification permissions granted: \(granted)")
         } catch {
-            logger.error("Failed to request notification permissions: \\(error)")
+            logger.error("Failed to request notification permissions: \(error)")
         }
     }
 
@@ -141,6 +156,15 @@ class AppDelegate: NSObject, UIApplicationDelegate {
         case "settings":
             handleSettingsURL(url)
             return true
+        case "blocked-app":
+            handleBlockedAppURL(url)
+            return true
+        case "app-launched":
+            handleAppLaunchedURL(url)
+            return true
+        case "automation-triggered":
+            handleAutomationTriggeredURL(url)
+            return true
         default:
             logger.warning("Unknown URL host: \(url.host ?? "nil")")
             return false
@@ -161,6 +185,76 @@ class AppDelegate: NSObject, UIApplicationDelegate {
         logger.info("Handling settings URL")
         NotificationCenter.default.post(name: .openSettingsFromURL, object: url)
     }
+
+    private func handleBlockedAppURL(_ url: URL) {
+        logger.info("Handling blocked app URL: \(url.absoluteString)")
+
+        // Parse app bundle ID and mode from URL
+        let queryItems = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems
+        let appBundleId = queryItems?.first(where: { $0.name == "app" })?.value ?? "unknown"
+        let mode = queryItems?.first(where: { $0.name == "mode" })?.value ?? "block"
+
+        logger.info("Blocked app accessed: \(appBundleId) in mode: \(mode)")
+
+        // Show kiosk blocking overlay
+        NotificationCenter.default.post(
+            name: .appBlocked,
+            object: ["app": appBundleId, "mode": mode, "timestamp": Date()]
+        )
+
+        // Track violation for analytics
+        AnalyticsService.shared.trackViolation(
+            type: .blockedAppAccessed,
+            appId: appBundleId,
+            severity: .medium
+        )
+    }
+
+    private func handleAppLaunchedURL(_ url: URL) {
+        logger.info("Handling app launched URL: \(url.absoluteString)")
+
+        // Parse app bundle ID from URL
+        let queryItems = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems
+        let appBundleId = queryItems?.first(where: { $0.name == "app" })?.value ?? "unknown"
+
+        logger.info("App launched detected: \(appBundleId)")
+
+        // Post notification for session manager to handle
+        NotificationCenter.default.post(
+            name: .appLaunched,
+            object: ["app": appBundleId, "timestamp": Date()]
+        )
+    }
+
+    private func handleAutomationTriggeredURL(_ url: URL) {
+        logger.info("Handling automation triggered URL: \(url.absoluteString)")
+
+        // Parse automation details from URL
+        let queryItems = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems
+        let automationType = queryItems?.first(where: { $0.name == "type" })?.value ?? "unknown"
+        let appBundleId = queryItems?.first(where: { $0.name == "app" })?.value
+        let status = queryItems?.first(where: { $0.name == "status" })?.value ?? "triggered"
+
+        logger.info("Automation triggered: type=\(automationType), app=\(appBundleId ?? "none"), status=\(status)")
+
+        // Track automation execution for analytics
+        AnalyticsService.shared.trackAutomationExecution(
+            type: automationType,
+            appId: appBundleId,
+            status: status
+        )
+
+        // Post notification for UI updates
+        NotificationCenter.default.post(
+            name: .automationTriggered,
+            object: [
+                "type": automationType,
+                "app": appBundleId as Any,
+                "status": status,
+                "timestamp": Date()
+            ]
+        )
+    }
 }
 
 // MARK: - Notification Names
@@ -168,4 +262,7 @@ extension Notification.Name {
     static let startSessionFromURL = Notification.Name("startSessionFromURL")
     static let pauseSessionFromURL = Notification.Name("pauseSessionFromURL")
     static let openSettingsFromURL = Notification.Name("openSettingsFromURL")
+    static let appBlocked = Notification.Name("appBlocked")
+    static let appLaunched = Notification.Name("appLaunched")
+    static let automationTriggered = Notification.Name("automationTriggered")
 }

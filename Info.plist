@@ -20,5 +20,25 @@
 	<string>1</string>
 	<key>UILaunchScreen</key>
 	<dict/>
+	<key>LSApplicationQueriesSchemes</key>
+	<array>
+		<string>fb</string>
+		<string>instagram</string>
+		<string>twitter</string>
+		<string>tiktok</string>
+		<string>youtube</string>
+		<string>spotify</string>
+		<string>netflix</string>
+		<string>snapchat</string>
+		<string>discord</string>
+		<string>reddit</string>
+		<string>chrome</string>
+		<string>outlook</string>
+		<string>amazon</string>
+		<string>uber</string>
+		<string>airbnb</string>
+	</array>
+	<key>NSFamilyControlsUsageDescription</key>
+	<string>MappLock needs Family Controls access to help manage screen time and app usage.</string>
 </dict>
 </plist>

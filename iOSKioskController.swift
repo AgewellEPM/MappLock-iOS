@@ -1,5 +1,7 @@
 // iOSKioskController.swift - iOS-Specific Kiosk Implementation
+import Foundation
 import UIKit
+import SwiftUI
 import Combine
 import LocalAuthentication
 import OSLog
@@ -431,34 +433,7 @@ public final class iOSKioskController: ObservableObject, KioskControllerProtocol
 }
 
 // MARK: - Supporting Types
-public enum KioskError: Error, LocalizedError {
-    case alreadyActive
-    case notActive
-    case notPaused
-    case permissionDenied
-    case deviceNotSupervised
-    case operationNotSupported
-    case windowSceneUnavailable
-
-    public var errorDescription: String? {
-        switch self {
-        case .alreadyActive:
-            return "Kiosk mode is already active"
-        case .notActive:
-            return "Kiosk mode is not active"
-        case .notPaused:
-            return "Kiosk mode is not paused"
-        case .permissionDenied:
-            return "Required permissions not granted"
-        case .deviceNotSupervised:
-            return "Device must be supervised for this feature"
-        case .operationNotSupported:
-            return "Operation not supported in current mode"
-        case .windowSceneUnavailable:
-            return "Window scene not available"
-        }
-    }
-}
+// KioskError is now defined in MappLockCore.swift
 
 // MARK: - Overlay View Controller
 class KioskOverlayViewController: UIViewController {

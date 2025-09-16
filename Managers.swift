@@ -215,7 +215,19 @@ public class AnalyticsService {
         ])
     }
 
-    public func trackViolation(_ type: ViolationType) {
-        trackEvent("violation_detected", parameters: ["type": type.rawValue])
+    public func trackViolation(type: ViolationType, appId: String? = nil, severity: ViolationSeverity = .medium) {
+        var parameters: [String: Any] = ["type": type.rawValue, "severity": severity.rawValue]
+        if let appId = appId {
+            parameters["app_id"] = appId
+        }
+        trackEvent("violation_detected", parameters: parameters)
+    }
+
+    public func trackAutomationExecution(type: String, appId: String? = nil, status: String = "executed") {
+        var parameters: [String: Any] = ["automation_type": type, "status": status]
+        if let appId = appId {
+            parameters["app_id"] = appId
+        }
+        trackEvent("automation_execution", parameters: parameters)
     }
 }

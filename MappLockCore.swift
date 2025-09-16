@@ -107,6 +107,7 @@ public enum ViolationType: String, Codable {
     case hardwareButton = "hardware_button"
     case timeLimit = "time_limit"
     case networkChange = "network_change"
+    case blockedAppAccessed = "blocked_app_accessed"
 
     public var displayName: String {
         switch self {
@@ -118,6 +119,7 @@ public enum ViolationType: String, Codable {
         case .hardwareButton: return "Hardware Button"
         case .timeLimit: return "Time Limit Exceeded"
         case .networkChange: return "Network Change"
+        case .blockedAppAccessed: return "Blocked App Access"
         }
     }
 }
@@ -411,5 +413,47 @@ public struct ManagementProfile: Codable {
         self.organizationName = organizationName
         self.profileID = profileID
         self.version = version
+    }
+}
+
+// MARK: - Error Types
+public enum KioskError: Error, LocalizedError {
+    case notSupported
+    case alreadyActive
+    case notActive
+    case notPaused
+    case operationNotSupported
+    case deviceNotSupervised
+    case windowSceneUnavailable
+    case authenticationFailed
+    case permissionDenied
+    case configurationInvalid
+    case networkError
+
+    public var errorDescription: String? {
+        switch self {
+        case .notSupported:
+            return "This device does not support kiosk mode"
+        case .alreadyActive:
+            return "Kiosk mode is already active"
+        case .notActive:
+            return "Kiosk mode is not currently active"
+        case .notPaused:
+            return "Kiosk mode is not currently paused"
+        case .operationNotSupported:
+            return "This operation is not supported on this device"
+        case .deviceNotSupervised:
+            return "Device must be supervised to use this feature"
+        case .windowSceneUnavailable:
+            return "Unable to access window scene"
+        case .authenticationFailed:
+            return "Authentication failed"
+        case .permissionDenied:
+            return "Permission denied"
+        case .configurationInvalid:
+            return "Configuration is invalid"
+        case .networkError:
+            return "Network error occurred"
+        }
     }
 }
