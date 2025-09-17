@@ -38,12 +38,12 @@ struct SimpleContentView: View {
                     .edgesIgnoringSafeArea(.all)
 
                 ScrollView(.vertical, showsIndicators: false) {
-                    VStack(spacing: 20) {
+                    VStack(spacing: 16) {
                         Spacer()
-                            .frame(height: 20) // Small top spacing for logo
+                            .frame(height: 30) // Balanced top spacing for logo
 
                         // Modern Header with glass effect
-                        VStack(spacing: 4) {
+                        VStack(spacing: 6) {
                             ZStack {
                                 // Magical glow rings
                                 ForEach(0..<3, id: \.self) { i in
@@ -139,7 +139,7 @@ struct SimpleContentView: View {
 
                         // Add spacing after header
                         Spacer()
-                            .frame(height: 60)
+                            .frame(height: 40)
 
                         // Modern Session Status Card
                         ModernSessionCard(
